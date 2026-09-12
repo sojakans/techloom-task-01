@@ -1,0 +1,21 @@
+{
+  "name": "techloom-pos-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fullstack POS Order & Inventory System deployed on Vercel",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "build": "npm --prefix client run build",
+    "start": "node server/index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "mongoose": "^8.6.0",
+    "uuid": "^10.0.0"
+  }
+}

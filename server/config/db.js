@@ -11,23 +11,27 @@ try {
   // Ignore if not permitted
 }
 
-let mongoMemoryServer = null;
+let cachedConn = null;
 
 /**
  * Connect to MongoDB.
- * Attempts connection to configured MONGO_URI.
- * If local MongoDB is not running (ECONNREFUSED), automatically starts an
- * embedded in-memory MongoDB server as a zero-config fallback.
+ * Reuses active connection in serverless / lambda environments (Vercel).
  */
 const connectDB = async () => {
+  if (cachedConn && mongoose.connection.readyState === 1) {
+    return cachedConn;
+  }
+
   const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/pos_system';
 
   try {
     console.log(`[DB] Connecting to MongoDB: ${mongoUri.replace(/:([^:@]+)@/, ':****@')}...`);
     const conn = await mongoose.connect(mongoUri, {
       serverSelectionTimeoutMS: 8000,
+      bufferCommands: false,
     });
-    console.log(`[DB] Connected to MongoDB Atlas: ${conn.connection.host}/${conn.connection.name}`);
+    console.log(`[DB] Connected to MongoDB: ${conn.connection.host}/${conn.connection.name}`);
+    cachedConn = conn;
 
     // Check if replica set is available for transaction support
     try {
@@ -43,7 +47,12 @@ const connectDB = async () => {
     await autoSeedIfEmpty();
     return conn;
   } catch (error) {
-    console.warn(`[DB] MongoDB Atlas connection failed (${error.message}).`);
+    if (process.env.VERCEL) {
+      console.error(`[DB] MongoDB Atlas connection failed on Vercel: ${error.message}`);
+      throw error;
+    }
+
+    console.warn(`[DB] MongoDB connection failed (${error.message}).`);
     console.log('[DB] Starting embedded In-Memory MongoDB server for zero-config execution...');
 
     try {
@@ -54,6 +63,7 @@ const connectDB = async () => {
       const conn = await mongoose.connect(memoryUri);
       console.log(`[DB] Embedded MongoDB active at: ${memoryUri}`);
       global.__TRANSACTIONS_SUPPORTED = true;
+      cachedConn = conn;
 
       await autoSeedIfEmpty();
       return conn;
