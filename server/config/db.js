@@ -1,14 +1,17 @@
 const mongoose = require('mongoose');
 const dns = require('dns');
 
-// Configure public DNS resolvers to prevent Windows ISP SRV lookup failures (ENOTFOUND)
-try {
-  dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
-  if (dns.setDefaultResultOrder) {
-    dns.setDefaultResultOrder('ipv4first');
+// Configure public DNS resolvers ONLY on local Windows (prevent ISP SRV lookup failures)
+// In cloud / Vercel Lambda environments, default VPC resolver must be used
+if (process.platform === 'win32' && !process.env.VERCEL) {
+  try {
+    dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+    if (dns.setDefaultResultOrder) {
+      dns.setDefaultResultOrder('ipv4first');
+    }
+  } catch (e) {
+    // Ignore if not permitted
   }
-} catch (e) {
-  // Ignore if not permitted
 }
 
 let cachedConn = null;
@@ -22,7 +25,8 @@ const connectDB = async () => {
     return cachedConn;
   }
 
-  const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/pos_system';
+  const defaultUri = 'mongodb+srv://sojakanjakan_db_user:lFFWRTapjh1Xk2Zb@cluster0.gtwrmt4.mongodb.net/pos_system?retryWrites=true&w=majority';
+  const mongoUri = process.env.MONGO_URI || defaultUri;
 
   try {
     console.log(`[DB] Connecting to MongoDB: ${mongoUri.replace(/:([^:@]+)@/, ':****@')}...`);
